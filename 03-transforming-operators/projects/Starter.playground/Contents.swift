@@ -3,7 +3,102 @@ import Combine
 
 var subscriptions = Set<AnyCancellable>()
 
-<#Add your code here#>
+example(of: "collect") {
+    ["R", "G", "B", "X", "Y", "Z"]
+        .publisher
+        .collect(2)
+        .sink(receiveCompletion: { print($0) },
+              receiveValue: { print($0) })
+        .store(in: &subscriptions)
+}
+
+example(of: "map") {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .spellOut
+
+    [1, 23, 456]
+        .publisher
+        .map { formatter.string(for: NSNumber(integerLiteral: $0)) ?? "" }
+        .sink(receiveValue: { print($0) })
+        .store(in: &subscriptions)
+}
+
+example(of: "Mapping key paths") {
+    let publisher = PassthroughSubject<Coordinate, Never>()
+    
+    publisher
+        .map(\.x, \.y)
+        .sink(receiveValue: { x, y in
+            print("Coorodinate: \(x), \(y) (quadrant \(quadrantOf(x: x, y: y)))")
+        })
+        .store(in: &subscriptions)
+    
+    publisher.send(Coordinate(x: 2, y: 4))
+    publisher.send(Coordinate(x: -3, y: -9))
+}
+
+example(of: "tryMap") {
+    Just("Dirctory name that does not exist")
+        .tryMap { try FileManager.default.contentsOfDirectory(atPath: $0) }
+        .sink(receiveCompletion: { print($0) },
+              receiveValue: { print($0) })
+        .store(in: &subscriptions)
+}
+
+example(of: "flatMap") {
+    func decode(_ codes: [Int]) -> AnyPublisher<String, Never> {
+        Just(
+            codes
+                .compactMap { code in
+                    guard (32...255).contains(code) else{ return nil }
+                    return String(UnicodeScalar(code) ?? " ")
+                }
+                .joined()
+        )
+            .eraseToAnyPublisher()
+    }
+    
+    [72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33]
+        .publisher
+        .collect()
+        .flatMap(decode)
+        .sink(receiveValue: { print($0) })
+        .store(in: &subscriptions)
+}
+
+example(of: "replaceNil") {
+    ["X", nil, "Z"]
+        .publisher
+        .eraseToAnyPublisher()
+        .replaceNil(with: "-")
+        .sink(receiveValue: { print($0) })
+        .store(in: &subscriptions)
+}
+
+example(of: "replaceEmpty") {
+    let empty = Empty<Int, Never>()
+    
+    empty
+        .replaceEmpty(with: 7)
+        .sink(receiveCompletion: { print($0) },
+              receiveValue: { print($0) } )
+        .store(in: &subscriptions)
+}
+
+example(of: "scan") {
+    var dailyGainLoss: Int { .random(in: -10...10) }
+    
+    let april2022 = (0..<16)
+        .map { _ in dailyGainLoss }
+        .publisher
+    
+    april2022
+        .scan(50) { latest, current in
+            max(0, latest + current)
+        }
+        .sink(receiveValue: { _ in })
+        .store(in: &subscriptions)
+}
 
 /// Copyright (c) 2021 Razeware LLC
 ///
